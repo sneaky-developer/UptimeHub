@@ -1,0 +1,5 @@
+{
+    "name": "UptimeHub",
+    "description": "Self-hosted Kubernetes uptime monitoring",
+    "version": "1.0.0"
+}

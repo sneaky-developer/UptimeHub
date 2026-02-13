@@ -87,3 +87,13 @@ export interface LoginResponse {
     name: string;
     email: string;
 }
+
+export interface NotificationChannel {
+    id: string;
+    name: string;
+    type: 'email' | 'slack' | 'webhook';
+    config: Record<string, any>;
+    enabled: boolean;
+    created_at: string;
+    updated_at: string;
+}

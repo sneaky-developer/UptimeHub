@@ -9,16 +9,18 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/sneaky-developer/UptimeHub/master/internal/models"
+	"github.com/sneaky-developer/UptimeHub/master/internal/notifier"
 )
 
 // MonitorService handles business logic for check results and service status
 type MonitorService struct {
-	db *gorm.DB
+	db       *gorm.DB
+	notifier *notifier.Service
 }
 
 // NewMonitorService creates a new MonitorService
-func NewMonitorService(db *gorm.DB) *MonitorService {
-	return &MonitorService{db: db}
+func NewMonitorService(db *gorm.DB, notifier *notifier.Service) *MonitorService {
+	return &MonitorService{db: db, notifier: notifier}
 }
 
 // ProcessCheckResults processes a batch of check results from an agent
@@ -116,6 +118,9 @@ func (s *MonitorService) createAutoIncident(service *models.Service) {
 		return
 	}
 
+	// Load service details for notification context
+	incident.Service = service
+
 	// Create initial update
 	update := models.IncidentUpdate{
 		IncidentID: incident.ID,
@@ -125,6 +130,9 @@ func (s *MonitorService) createAutoIncident(service *models.Service) {
 	s.db.Create(&update)
 
 	log.Printf("🔴 Auto-incident created for service %s: %s", service.Name, incident.ID)
+
+	// Trigger Alert
+	go s.notifier.Notify(&incident)
 }
 
 // resolveAutoIncidents resolves any open auto-incidents for a recovered service
@@ -140,6 +148,9 @@ func (s *MonitorService) resolveAutoIncidents(service *models.Service) {
 			"resolved_at": now,
 		})
 
+		// Load service details for notification context
+		incident.Service = service
+
 		update := models.IncidentUpdate{
 			IncidentID: incident.ID,
 			Status:     "resolved",
@@ -148,5 +159,8 @@ func (s *MonitorService) resolveAutoIncidents(service *models.Service) {
 		s.db.Create(&update)
 
 		log.Printf("🟢 Auto-incident resolved for service %s: %s", service.Name, incident.ID)
+
+		// Trigger Alert
+		go s.notifier.Notify(&incident)
 	}
 }

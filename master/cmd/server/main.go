@@ -12,6 +12,7 @@ import (
 	"github.com/sneaky-developer/UptimeHub/master/internal/database"
 	"github.com/sneaky-developer/UptimeHub/master/internal/handlers"
 	"github.com/sneaky-developer/UptimeHub/master/internal/middleware"
+	"github.com/sneaky-developer/UptimeHub/master/internal/notifier"
 	"github.com/sneaky-developer/UptimeHub/master/internal/services"
 )
 
@@ -34,7 +35,8 @@ func main() {
 	services.SeedDefaultAdmin(db)
 
 	// Initialize services
-	monitorSvc := services.NewMonitorService(db)
+	notifierSvc := notifier.NewService(db)
+	monitorSvc := services.NewMonitorService(db, notifierSvc)
 	aggregatorSvc := services.NewAggregatorService(db)
 
 	// Start background workers
@@ -103,6 +105,17 @@ func main() {
 
 		// Config
 		admin.PUT("/config", adminHandler.UpdateConfig)
+
+		// ─── Alerts ─────────────────────────────────────────────────────
+		alertHandler := handlers.NewAlertHandler(db, notifierSvc)
+		alerts := admin.Group("/alerts")
+		{
+			alerts.GET("/channels", alertHandler.ListChannels)
+			alerts.POST("/channels", alertHandler.CreateChannel)
+			alerts.PUT("/channels/:id", alertHandler.UpdateChannel)
+			alerts.DELETE("/channels/:id", alertHandler.DeleteChannel)
+			alerts.POST("/channels/:id/test", alertHandler.TestChannel)
+		}
 	}
 
 	// ─── Graceful shutdown ──────────────────────────────────────────

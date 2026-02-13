@@ -74,3 +74,14 @@ export const updateIncident = (id: string, data: Record<string, unknown>) =>
 export const getAdminMaintenance = () => adminApi.get('/api/admin/maintenance');
 export const createMaintenance = (data: Record<string, unknown>) =>
     adminApi.post('/api/admin/maintenance', data);
+
+// Admin — Alerts
+export const getNotificationChannels = () => adminApi.get('/api/admin/alerts/channels');
+export const createNotificationChannel = (data: Record<string, unknown>) =>
+    adminApi.post('/api/admin/alerts/channels', data);
+export const updateNotificationChannel = (id: string, data: Record<string, unknown>) =>
+    adminApi.put(`/api/admin/alerts/channels/${id}`, data);
+export const deleteNotificationChannel = (id: string) =>
+    adminApi.delete(`/api/admin/alerts/channels/${id}`);
+export const testNotificationChannel = (id: string) =>
+    adminApi.post(`/api/admin/alerts/channels/${id}/test`);

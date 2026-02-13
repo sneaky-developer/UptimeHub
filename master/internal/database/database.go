@@ -55,5 +55,7 @@ func runMigrations(db *gorm.DB) error {
 		&models.IncidentUpdate{},
 		&models.MaintenanceWindow{},
 		&models.AdminUser{},
+		&models.NotificationChannel{},
+		&models.AlertLog{},
 	)
 }

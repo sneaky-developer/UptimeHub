@@ -115,3 +115,27 @@ type AdminUser struct {
 	UpdatedAt    time.Time      `json:"updated_at"`
 	DeletedAt    gorm.DeletedAt `gorm:"index" json:"-"`
 }
+
+// NotificationChannel represents a destination for alerts (email, slack, etc.)
+type NotificationChannel struct {
+	ID        uuid.UUID      `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	Name      string         `gorm:"size:255;not null" json:"name"`
+	Type      string         `gorm:"size:50;not null" json:"type"` // email, slack, webhook
+	Config    JSON           `gorm:"type:jsonb;default:'{}'" json:"config"`
+	Enabled   bool           `gorm:"default:true" json:"enabled"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+}
+
+// AlertLog tracks sent alerts
+type AlertLog struct {
+	ID          uuid.UUID           `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	ChannelID   uuid.UUID           `gorm:"type:uuid;not null;index" json:"channel_id"`
+	IncidentID  uuid.UUID           `gorm:"type:uuid;not null;index" json:"incident_id"`
+	Status      string              `gorm:"size:50;not null" json:"status"` // sent, failed
+	Error       string              `gorm:"type:text" json:"error,omitempty"`
+	CreatedAt   time.Time           `json:"created_at"`
+	Channel     *NotificationChannel `gorm:"foreignKey:ChannelID" json:"channel,omitempty"`
+	Incident    *Incident           `gorm:"foreignKey:IncidentID" json:"incident,omitempty"`
+}

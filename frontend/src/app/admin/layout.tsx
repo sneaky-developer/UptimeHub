@@ -10,6 +10,7 @@ import {
     AlertTriangle,
     Cpu,
     LogOut,
+    Bell,
 } from 'lucide-react';
 
 const navItems = [
@@ -17,6 +18,7 @@ const navItems = [
     { href: '/admin/services', icon: Server, label: 'Services' },
     { href: '/admin/incidents', icon: AlertTriangle, label: 'Incidents' },
     { href: '/admin/agents', icon: Cpu, label: 'Agents' },
+    { href: '/admin/settings/alerts', icon: Bell, label: 'Alerts' },
 ];
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
@@ -78,8 +80,8 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
                                 key={item.href}
                                 href={item.href}
                                 className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${isActive
-                                        ? 'bg-brand-600/20 text-brand-400 border border-brand-500/20'
-                                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                                    ? 'bg-brand-600/20 text-brand-400 border border-brand-500/20'
+                                    : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
                                     }`}
                             >
                                 <item.icon className="w-4.5 h-4.5" />

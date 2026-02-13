@@ -1,8 +1,8 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getAdminServices, createService, deleteService } from '@/lib/api';
-import type { Service } from '@/types';
+import { getAdminServices, getAdminAgents, createService, deleteService } from '@/lib/api';
+import type { Service, Agent } from '@/types';
 import { useState } from 'react';
 import { Server, Plus, Trash2, ExternalLink, X } from 'lucide-react';
 
@@ -13,6 +13,11 @@ export default function ServicesPage() {
     const { data: services, isLoading } = useQuery<Service[]>({
         queryKey: ['admin-services'],
         queryFn: () => getAdminServices().then((r) => r.data),
+    });
+
+    const { data: agents } = useQuery<Agent[]>({
+        queryKey: ['admin-agents'],
+        queryFn: () => getAdminAgents().then((r) => r.data),
     });
 
     const createMutation = useMutation({
@@ -36,6 +41,7 @@ export default function ServicesPage() {
         createMutation.mutate({
             name: formData.get('name'),
             url: formData.get('url'),
+            agent_id: formData.get('agent_id'),
             group_name: formData.get('group_name'),
             check_interval: Number(formData.get('check_interval')) || 30,
             timeout: Number(formData.get('timeout')) || 10,
@@ -78,6 +84,17 @@ export default function ServicesPage() {
                         <div>
                             <label className="block text-sm font-medium text-slate-300 mb-1">URL</label>
                             <input name="url" className="input-field" placeholder="https://api.example.com/health" required />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-1">Agent</label>
+                            <select name="agent_id" className="input-field appearance-none" required>
+                                <option value="">Select an Agent</option>
+                                {agents?.map((agent) => (
+                                    <option key={agent.id} value={agent.id}>
+                                        {agent.name} ({agent.cluster_name})
+                                    </option>
+                                ))}
+                            </select>
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-slate-300 mb-1">Group</label>

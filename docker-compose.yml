@@ -71,6 +71,19 @@ services:
     depends_on:
       - master
 
+  agent:
+    build:
+      context: ./agent
+      dockerfile: Dockerfile
+    container_name: uptimehub-agent
+    restart: unless-stopped
+    environment:
+      - MASTER_URL=http://master:8080
+      - AGENT_NAME=local-agent-1
+      - CLUSTER_NAME=local-docker
+    depends_on:
+      - master
+
 volumes:
   postgres_data:
   redis_data:

@@ -7,11 +7,22 @@ import (
 	"gorm.io/gorm"
 )
 
+// AgentGroup represents a cluster or group of worker agents
+type AgentGroup struct {
+	ID        uuid.UUID      `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	Name      string         `gorm:"size:255;not null;uniqueIndex" json:"name"`
+	Token     string         `gorm:"size:512;not null;uniqueIndex" json:"token"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
+	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
+	Agents    []Agent        `gorm:"foreignKey:AgentGroupID" json:"agents,omitempty"`
+}
+
 // Agent represents a registered worker agent running in a Kubernetes cluster
 type Agent struct {
 	ID            uuid.UUID      `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
+	AgentGroupID  *uuid.UUID     `gorm:"type:uuid;index" json:"agent_group_id"`
 	Name          string         `gorm:"size:255;not null" json:"name"`
-	ClusterName   string         `gorm:"size:255;not null" json:"cluster_name"`
 	Token         string         `gorm:"size:512;not null;uniqueIndex" json:"-"`
 	Status        string         `gorm:"size:20;default:'pending'" json:"status"` // pending, active, inactive
 	LastHeartbeat *time.Time     `json:"last_heartbeat"`
@@ -19,6 +30,7 @@ type Agent struct {
 	CreatedAt     time.Time      `json:"created_at"`
 	UpdatedAt     time.Time      `json:"updated_at"`
 	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`
+	AgentGroup    *AgentGroup    `gorm:"foreignKey:AgentGroupID" json:"group,omitempty"`
 	Services      []Service      `gorm:"foreignKey:AgentID" json:"services,omitempty"`
 }
 
@@ -27,6 +39,7 @@ type Service struct {
 	ID               uuid.UUID      `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
 	AgentID          *uuid.UUID     `gorm:"type:uuid;index" json:"agent_id"`
 	Name             string         `gorm:"size:255;not null" json:"name"`
+	Type             string         `gorm:"size:50;not null;default:'http'" json:"type"`
 	URL              string         `gorm:"size:2048;not null" json:"url"`
 	CheckInterval    int            `gorm:"default:30" json:"check_interval"`     // seconds
 	Timeout          int            `gorm:"default:10" json:"timeout"`            // seconds

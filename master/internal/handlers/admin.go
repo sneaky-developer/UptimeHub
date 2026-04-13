@@ -1,7 +1,10 @@
 package handlers
 
 import (
+	"errors"
+	"net"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -57,12 +60,83 @@ func (h *AdminHandler) Login(c *gin.Context) {
 	})
 }
 
+// ─── Agent Groups ───────────────────────────────────────────────────
+
+// ListAgentGroups handles GET /api/admin/agent-groups
+func (h *AdminHandler) ListAgentGroups(c *gin.Context) {
+	var groups []models.AgentGroup
+	h.db.Order("created_at DESC").Find(&groups)
+
+	responses := make([]dto.AgentGroupResponse, 0, len(groups))
+	for _, g := range groups {
+		responses = append(responses, dto.AgentGroupResponse{
+			ID:        g.ID,
+			Name:      g.Name,
+			CreatedAt: g.CreatedAt,
+			// Intentionally omitting Token for list view
+		})
+	}
+
+	c.JSON(http.StatusOK, responses)
+}
+
+// CreateAgentGroup handles POST /api/admin/agent-groups
+func (h *AdminHandler) CreateAgentGroup(c *gin.Context) {
+	var req dto.CreateAgentGroupRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: "Invalid request", Message: err.Error()})
+		return
+	}
+
+	token, err := generateToken(64) // generateToken is defined in agent.go
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: "Failed to generate token"})
+		return
+	}
+
+	group := models.AgentGroup{
+		Name:  req.Name,
+		Token: token,
+	}
+
+	if err := h.db.Create(&group).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: "Failed to create agent group (name might already exist)"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, dto.AgentGroupResponse{
+		ID:        group.ID,
+		Name:      group.Name,
+		Token:     group.Token, // Return token ONLY on creation
+		CreatedAt: group.CreatedAt,
+	})
+}
+
+// DeleteAgentGroup handles DELETE /api/admin/agent-groups/:id
+func (h *AdminHandler) DeleteAgentGroup(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: "Invalid group ID"})
+		return
+	}
+
+	// Delete associated agents first
+	h.db.Where("agent_group_id = ?", id).Delete(&models.Agent{})
+	// Delete group
+	if err := h.db.Delete(&models.AgentGroup{}, id).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: "Failed to delete agent group"})
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.SuccessResponse{Message: "Agent group deleted"})
+}
+
 // ─── Agents ─────────────────────────────────────────────────────────
 
 // ListAgents handles GET /api/admin/agents
 func (h *AdminHandler) ListAgents(c *gin.Context) {
 	var agents []models.Agent
-	h.db.Order("created_at DESC").Find(&agents)
+	h.db.Preload("AgentGroup").Order("created_at DESC").Find(&agents)
 	c.JSON(http.StatusOK, agents)
 }
 
@@ -83,8 +157,14 @@ func (h *AdminHandler) CreateService(c *gin.Context) {
 		return
 	}
 
+	if err := validateServiceURL(req.Type, req.URL); err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: "Invalid URL/Address format for select type", Message: err.Error()})
+		return
+	}
+
 	service := models.Service{
 		Name:             req.Name,
+		Type:             req.Type,
 		URL:              req.URL,
 		AgentID:          req.AgentID,
 		CheckInterval:    defaultInt(req.CheckInterval, 30),
@@ -124,9 +204,25 @@ func (h *AdminHandler) UpdateService(c *gin.Context) {
 		return
 	}
 
+	if req.URL != nil && req.Type != nil {
+		if err := validateServiceURL(*req.Type, *req.URL); err != nil {
+			c.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: "Invalid URL for selected type", Message: err.Error()})
+			return
+		}
+	} else if req.URL != nil {
+		// Verify against existing type
+		if err := validateServiceURL(service.Type, *req.URL); err != nil {
+			c.JSON(http.StatusBadRequest, dto.ErrorResponse{Error: "Invalid URL for selected type", Message: err.Error()})
+			return
+		}
+	}
+
 	updates := make(map[string]interface{})
 	if req.Name != nil {
 		updates["name"] = *req.Name
+	}
+	if req.Type != nil {
+		updates["type"] = *req.Type
 	}
 	if req.URL != nil {
 		updates["url"] = *req.URL
@@ -316,4 +412,30 @@ func defaultInt(val, def int) int {
 		return def
 	}
 	return val
+}
+
+func validateServiceURL(serviceType, u string) error {
+	if serviceType == "tcp" {
+		host, port, err := net.SplitHostPort(u)
+		if err != nil {
+			return errors.New("TCP address must be in format host:port")
+		}
+		if port == "" {
+			return errors.New("TCP address must specify a port")
+		}
+		if host == "" {
+			return errors.New("TCP address must specify a host")
+		}
+		return nil
+	}
+
+	// Default to HTTP validation
+	parsedURL, err := url.ParseRequestURI(u)
+	if err != nil {
+		return errors.New("invalid HTTP URL format")
+	}
+	if parsedURL.Scheme != "http" && parsedURL.Scheme != "https" {
+		return errors.New("URL scheme must be http or https")
+	}
+	return nil
 }

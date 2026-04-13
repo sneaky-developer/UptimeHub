@@ -34,24 +34,49 @@ func (h *AgentHandler) Register(c *gin.Context) {
 		return
 	}
 
-	// Generate a random token for the agent
+	authHeader := c.GetHeader("Authorization")
+	if authHeader == "" || len(authHeader) < 8 || authHeader[:7] != "Bearer " {
+		c.JSON(http.StatusUnauthorized, dto.ErrorResponse{Error: "Missing or invalid enrollment token"})
+		return
+	}
+	enrollmentToken := authHeader[7:]
+
+	var group models.AgentGroup
+	if err := h.db.Where("token = ?", enrollmentToken).First(&group).Error; err != nil {
+		c.JSON(http.StatusUnauthorized, dto.ErrorResponse{Error: "Invalid enrollment token"})
+		return
+	}
+
+	// Generate a random session token for the agent
 	token, err := generateToken(64)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: "Failed to generate token"})
 		return
 	}
 
-	agent := models.Agent{
-		Name:        req.Name,
-		ClusterName: req.ClusterName,
-		Token:       token,
-		Status:      "active",
-		Metadata:    models.JSON(req.Metadata),
-	}
-
-	if err := h.db.Create(&agent).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: "Failed to register agent"})
-		return
+	var agent models.Agent
+	if err := h.db.Where("name = ? AND agent_group_id = ?", req.Name, group.ID).First(&agent).Error; err != nil {
+		// Does not exist, create new
+		agent = models.Agent{
+			Name:         req.Name,
+			AgentGroupID: &group.ID,
+			Token:        token,
+			Status:       "active",
+			Metadata:     models.JSON(req.Metadata),
+		}
+		if err := h.db.Create(&agent).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: "Failed to register new agent"})
+			return
+		}
+	} else {
+		// Update existing agent
+		agent.Token = token
+		agent.Metadata = models.JSON(req.Metadata)
+		agent.Status = "active"
+		if err := h.db.Save(&agent).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, dto.ErrorResponse{Error: "Failed to update existing agent"})
+			return
+		}
 	}
 
 	c.JSON(http.StatusCreated, dto.AgentRegisterResponse{
@@ -103,6 +128,7 @@ func (h *AgentHandler) Config(c *gin.Context) {
 	for _, svc := range svcs {
 		serviceConfigs = append(serviceConfigs, dto.ServiceConfig{
 			ID:               svc.ID,
+			Type:             svc.Type,
 			URL:              svc.URL,
 			CheckInterval:    svc.CheckInterval,
 			Timeout:          svc.Timeout,

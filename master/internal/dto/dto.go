@@ -9,9 +9,8 @@ import (
 // ─── Agent DTOs ─────────────────────────────────────────────────────
 
 type AgentRegisterRequest struct {
-	Name        string                 `json:"name" binding:"required"`
-	ClusterName string                 `json:"cluster_name" binding:"required"`
-	Metadata    map[string]interface{} `json:"metadata"`
+	Name     string                 `json:"name" binding:"required"`
+	Metadata map[string]interface{} `json:"metadata"`
 }
 
 type AgentRegisterResponse struct {
@@ -44,6 +43,7 @@ type AgentConfigResponse struct {
 
 type ServiceConfig struct {
 	ID               uuid.UUID `json:"id"`
+	Type             string    `json:"type"`
 	URL              string    `json:"url"`
 	CheckInterval    int       `json:"check_interval"`
 	Timeout          int       `json:"timeout"`
@@ -62,6 +62,17 @@ type AgentHeartbeatRequest struct {
 
 // ─── Admin DTOs ─────────────────────────────────────────────────────
 
+type CreateAgentGroupRequest struct {
+	Name string `json:"name" binding:"required"`
+}
+
+type AgentGroupResponse struct {
+	ID        uuid.UUID `json:"id"`
+	Name      string    `json:"name"`
+	Token     string    `json:"token,omitempty"` // Only returned on creation
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type AdminLoginRequest struct {
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required"`
@@ -75,7 +86,8 @@ type AdminLoginResponse struct {
 
 type CreateServiceRequest struct {
 	Name             string     `json:"name" binding:"required"`
-	URL              string     `json:"url" binding:"required,url"`
+	Type             string     `json:"type" binding:"required,oneof=http tcp"`
+	URL              string     `json:"url" binding:"required"` // Custom validation in handler
 	AgentID          *uuid.UUID `json:"agent_id"`
 	CheckInterval    int        `json:"check_interval"`
 	Timeout          int        `json:"timeout"`
@@ -87,6 +99,7 @@ type CreateServiceRequest struct {
 
 type UpdateServiceRequest struct {
 	Name             *string `json:"name"`
+	Type             *string `json:"type" binding:"omitempty,oneof=http tcp"`
 	URL              *string `json:"url"`
 	CheckInterval    *int    `json:"check_interval"`
 	Timeout          *int    `json:"timeout"`
@@ -122,6 +135,7 @@ type CreateMaintenanceRequest struct {
 type PublicServiceStatus struct {
 	ID        uuid.UUID          `json:"id"`
 	Name      string             `json:"name"`
+	Type      string             `json:"type"`
 	Status    string             `json:"status"`
 	GroupName string             `json:"group_name"`
 	UptimePct float64            `json:"uptime_pct"`

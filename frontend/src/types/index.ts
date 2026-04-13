@@ -55,10 +55,17 @@ export interface MaintenanceWindow {
     created_at: string;
 }
 
+export interface AgentGroup {
+    id: string;
+    name: string;
+    token?: string; // Only returned on creation
+    created_at: string;
+}
+
 export interface Agent {
     id: string;
     name: string;
-    cluster_name: string;
+    group?: AgentGroup;
     status: 'pending' | 'active' | 'inactive';
     last_heartbeat: string | null;
     metadata: Record<string, unknown>;

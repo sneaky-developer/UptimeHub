@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -24,6 +25,7 @@ type CheckResult struct {
 // Target represents an endpoint to be health-checked
 type Target struct {
 	ServiceID        string
+	Type             string
 	URL              string
 	Timeout          time.Duration
 	Retries          int
@@ -112,6 +114,51 @@ func (c *Checker) checkWithRetries(ctx context.Context, target Target) CheckResu
 
 // check performs a single HTTP health check
 func (c *Checker) check(ctx context.Context, target Target) CheckResult {
+	if target.Type == "tcp" {
+		return c.checkTCP(ctx, target)
+	}
+	return c.checkHTTP(ctx, target)
+}
+
+// checkTCP performs a raw TCP port check
+func (c *Checker) checkTCP(ctx context.Context, target Target) CheckResult {
+	result := CheckResult{
+		ServiceID: target.ServiceID,
+		URL:       target.URL,
+		CheckedAt: time.Now().UTC(),
+	}
+
+	timeout := target.Timeout
+	if timeout <= 0 {
+		timeout = 10 * time.Second
+	}
+
+	start := time.Now()
+	
+	// Create a dialer with timeout
+	dialer := net.Dialer{Timeout: timeout}
+	
+	// DialContext allows the connection attempt to be cancelled via context
+	conn, err := dialer.DialContext(ctx, "tcp", target.URL)
+	elapsed := time.Since(start)
+	
+	result.ResponseTime = int(elapsed.Milliseconds())
+
+	if err != nil {
+		result.IsUp = false
+		result.ErrorMessage = fmt.Sprintf("TCP connection failed: %v", err)
+		return result
+	}
+	
+	defer conn.Close()
+	result.IsUp = true
+	result.StatusCode = 200 // Mock status code for TCP success
+
+	return result
+}
+
+// checkHTTP performs a single HTTP health check
+func (c *Checker) checkHTTP(ctx context.Context, target Target) CheckResult {
 	result := CheckResult{
 		ServiceID: target.ServiceID,
 		URL:       target.URL,

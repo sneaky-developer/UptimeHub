@@ -7,8 +7,9 @@ import { useState } from 'react';
 import { Server, Plus, Trash2, ExternalLink, X } from 'lucide-react';
 
 export default function ServicesPage() {
-    const queryClient = useQueryClient();
-    const [showForm, setShowForm] = useState(false);
+	const queryClient = useQueryClient();
+	const [showForm, setShowForm] = useState(false);
+	const [checkType, setCheckType] = useState('http');
 
     const { data: services, isLoading } = useQuery<Service[]>({
         queryKey: ['admin-services'],
@@ -40,6 +41,7 @@ export default function ServicesPage() {
         const formData = new FormData(e.currentTarget);
         createMutation.mutate({
             name: formData.get('name'),
+            type: formData.get('type'),
             url: formData.get('url'),
             agent_id: formData.get('agent_id'),
             group_name: formData.get('group_name'),
@@ -78,12 +80,32 @@ export default function ServicesPage() {
                     </div>
                     <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-slate-300 mb-1">Name</label>
-                            <input name="name" className="input-field" placeholder="My API" required />
+                            <label className="block text-sm font-medium text-slate-300 mb-1">Check Type</label>
+                            <select 
+                                name="type" 
+                                className="input-field appearance-none" 
+                                value={checkType} 
+                                onChange={(e) => setCheckType(e.target.value)}
+                                required
+                            >
+                                <option value="http">HTTP / HTTPS</option>
+                                <option value="tcp">TCP Port</option>
+                            </select>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-slate-300 mb-1">URL</label>
-                            <input name="url" className="input-field" placeholder="https://api.example.com/health" required />
+                            <label className="block text-sm font-medium text-slate-300 mb-1">Name</label>
+                            <input name="name" className="input-field" placeholder="My Service" required />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-1">
+                                {checkType === 'http' ? 'URL' : 'Address (Host:Port)'}
+                            </label>
+                            <input 
+                                name="url" 
+                                className="input-field" 
+                                placeholder={checkType === 'http' ? 'https://api.example.com/health' : 'redis.default.svc:6379'} 
+                                required 
+                            />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-slate-300 mb-1">Agent</label>
@@ -91,7 +113,7 @@ export default function ServicesPage() {
                                 <option value="">Select an Agent</option>
                                 {agents?.map((agent) => (
                                     <option key={agent.id} value={agent.id}>
-                                        {agent.name} ({agent.cluster_name})
+                                        {agent.name} ({agent.group?.name || 'Unknown Group'})
                                     </option>
                                 ))}
                             </select>
@@ -154,11 +176,12 @@ export default function ServicesPage() {
                                             <span className="font-medium text-white">{svc.name}</span>
                                         </div>
                                     </td>
-                                    <td className="py-4 px-6">
-                                        <a href={svc.url} target="_blank" rel="noopener noreferrer" className="text-sm text-slate-400 hover:text-brand-400 flex items-center gap-1">
-                                            {svc.url.length > 40 ? svc.url.slice(0, 40) + '...' : svc.url}
-                                            <ExternalLink className="w-3 h-3" />
-                                        </a>
+                                    <td className="py-4 px-6 text-sm text-slate-400">
+                                        <span className="px-2 py-0.5 bg-slate-700/50 rounded text-xs uppercase mr-2 border border-slate-600/50">
+                                            {/* @ts-ignore - The API will return a type field */}
+                                            {svc.type || 'http'}
+                                        </span>
+                                        {svc.url.length > 40 ? svc.url.slice(0, 40) + '...' : svc.url}
                                     </td>
                                     <td className="py-4 px-6 text-sm text-slate-400">{svc.group_name || '—'}</td>
                                     <td className="py-4 px-6">

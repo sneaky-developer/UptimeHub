@@ -83,9 +83,8 @@ func (r *Reporter) ReportResults(results []CheckResultPayload) error {
 
 // RegisterRequest is the body for agent registration
 type RegisterRequest struct {
-	Name        string                 `json:"name"`
-	ClusterName string                 `json:"cluster_name"`
-	Metadata    map[string]interface{} `json:"metadata"`
+	Name     string                 `json:"name"`
+	Metadata map[string]interface{} `json:"metadata"`
 }
 
 // RegisterResponse holds the registration response
@@ -94,12 +93,11 @@ type RegisterResponse struct {
 	Token   string `json:"token"`
 }
 
-// Register registers the agent with the Master and returns the token
-func (r *Reporter) Register(name, clusterName string, metadata map[string]interface{}) (*RegisterResponse, error) {
+// Register registers the agent with the Master and returns the session token
+func (r *Reporter) Register(name, enrollmentToken string, metadata map[string]interface{}) (*RegisterResponse, error) {
 	body := RegisterRequest{
-		Name:        name,
-		ClusterName: clusterName,
-		Metadata:    metadata,
+		Name:     name,
+		Metadata: metadata,
 	}
 
 	data, err := json.Marshal(body)
@@ -113,6 +111,7 @@ func (r *Reporter) Register(name, clusterName string, metadata map[string]interf
 	}
 
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+enrollmentToken)
 
 	resp, err := r.client.Do(req)
 	if err != nil {
@@ -137,6 +136,7 @@ func (r *Reporter) Register(name, clusterName string, metadata map[string]interf
 // ServiceConfig from Master
 type ServiceConfig struct {
 	ID               string `json:"id"`
+	Type             string `json:"type"`
 	URL              string `json:"url"`
 	CheckInterval    int    `json:"check_interval"`
 	Timeout          int    `json:"timeout"`

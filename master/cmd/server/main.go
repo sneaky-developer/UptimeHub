@@ -88,6 +88,11 @@ func main() {
 		// Agents
 		admin.GET("/agents", adminHandler.ListAgents)
 
+		// Agent Groups
+		admin.GET("/agent-groups", adminHandler.ListAgentGroups)
+		admin.POST("/agent-groups", adminHandler.CreateAgentGroup)
+		admin.DELETE("/agent-groups/:id", adminHandler.DeleteAgentGroup)
+
 		// Services
 		admin.GET("/services", adminHandler.ListServices)
 		admin.POST("/services", adminHandler.CreateService)

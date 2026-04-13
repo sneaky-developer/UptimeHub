@@ -1,0 +1,10 @@
+**/node_modules
+**/.next
+**/out
+**/build
+**/.env*
+**.DS_Store
+.git
+.github
+agent/bin
+master/bin

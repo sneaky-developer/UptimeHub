@@ -60,8 +60,11 @@ export const updateService = (id: string, data: Record<string, unknown>) =>
 export const deleteService = (id: string) =>
     adminApi.delete(`/api/admin/services/${id}`);
 
-// Admin — Agents
+// Admin — Agents & Groups
 export const getAdminAgents = () => adminApi.get('/api/admin/agents');
+export const getAgentGroups = () => adminApi.get('/api/admin/agent-groups');
+export const createAgentGroup = (name: string) => adminApi.post('/api/admin/agent-groups', { name });
+export const deleteAgentGroup = (id: string) => adminApi.delete(`/api/admin/agent-groups/${id}`);
 
 // Admin — Incidents
 export const getAdminIncidents = () => adminApi.get('/api/admin/incidents');

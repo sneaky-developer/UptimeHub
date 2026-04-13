@@ -47,6 +47,7 @@ func Connect(cfg *config.Config) (*gorm.DB, error) {
 
 func runMigrations(db *gorm.DB) error {
 	return db.AutoMigrate(
+		&models.AgentGroup{},
 		&models.Agent{},
 		&models.Service{},
 		&models.CheckResult{},

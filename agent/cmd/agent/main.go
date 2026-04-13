@@ -24,6 +24,11 @@ func main() {
 	// Initialize reporter (Master communication)
 	rep := reporter.NewReporter(cfg.MasterURL, cfg.AgentToken)
 
+	// Enforce strict enrollment token policy
+	if cfg.EnrollmentToken == "" {
+		log.Fatalf("❌ FATAL: ENROLLMENT_TOKEN environment variable is missing. The agent cannot register without an authorized group token.")
+	}
+
 	// Register with Master if no token provided
 	if cfg.AgentToken == "" {
 		log.Println("📝 No agent token found, registering with Master...")
@@ -116,6 +121,7 @@ func runMonitoringLoop(ctx context.Context, cfg *config.Config, disc *discovery.
 				for _, svc := range masterConfig.Services {
 					targets = append(targets, checker.Target{
 						ServiceID: svc.ID,
+						Type:      svc.Type,
 						URL:       svc.URL,
 						Timeout:   time.Duration(svc.Timeout) * time.Second,
 						Retries:   svc.Retries,
@@ -155,7 +161,7 @@ func registerWithRetry(rep *reporter.Reporter, cfg *config.Config, maxRetries in
 	var lastErr error
 
 	for attempt := 0; attempt < maxRetries; attempt++ {
-		result, err := rep.Register(cfg.AgentName, cfg.ClusterName, map[string]interface{}{
+		result, err := rep.Register(cfg.AgentName, cfg.EnrollmentToken, map[string]interface{}{
 			"version": "1.0.0",
 		})
 		if err == nil {

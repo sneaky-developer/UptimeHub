@@ -1,21 +1,21 @@
 # ─── Build Stage ─────────────────────────────────────────────────────
-FROM node:20-alpine AS builder
+FROM node:20 AS builder
 
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
-RUN npm ci || npm install
+RUN npm install
 
 COPY . .
 RUN npm run build
 
 # ─── Runtime Stage ───────────────────────────────────────────────────
-FROM node:20-alpine
+FROM node:20-slim
 
 WORKDIR /app
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+RUN groupadd --system --gid 1001 nodejs
+RUN useradd --system --uid 1001 nextjs
 
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./

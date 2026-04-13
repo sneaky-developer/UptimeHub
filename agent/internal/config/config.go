@@ -11,12 +11,9 @@ type Config struct {
 	// Master server connection
 	MasterURL string
 	AgentName string
-	ClusterName string
+	EnrollmentToken string
 
-	// Registration (used for initial registration)
-	RegistrationToken string
-
-	// Agent token (obtained after registration, stored in file/secret)
+	// Agent token (obtained after registration, stored in memory)
 	AgentToken string
 
 	// Check defaults
@@ -39,8 +36,7 @@ func Load() *Config {
 	return &Config{
 		MasterURL:          getEnv("MASTER_URL", "http://localhost:8080"),
 		AgentName:          getEnv("AGENT_NAME", "default-agent"),
-		ClusterName:        getEnv("CLUSTER_NAME", "default-cluster"),
-		RegistrationToken:  getEnv("REGISTRATION_TOKEN", ""),
+		EnrollmentToken:    getEnv("ENROLLMENT_TOKEN", ""),
 		AgentToken:         getEnv("AGENT_TOKEN", ""),
 		DefaultInterval:    getDurationEnv("DEFAULT_INTERVAL", 30*time.Second),
 		DefaultTimeout:     getDurationEnv("DEFAULT_TIMEOUT", 10*time.Second),

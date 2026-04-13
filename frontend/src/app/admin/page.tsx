@@ -122,7 +122,7 @@ export default function AdminDashboard() {
                                 <div key={agent.id} className="flex items-center justify-between p-3 bg-slate-900/40 rounded-xl">
                                     <div>
                                         <p className="text-sm font-medium text-white">{agent.name}</p>
-                                        <p className="text-xs text-slate-500">{agent.cluster_name}</p>
+                                        <p className="text-xs text-slate-500">{agent.group?.name || 'Unknown Group'}</p>
                                     </div>
                                     <div className="text-right">
                                         <span className={`status-badge ${agent.status === 'active' ? 'status-up' : 'status-unknown'}`}>

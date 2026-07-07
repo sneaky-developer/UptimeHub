@@ -14,11 +14,11 @@ dev-down: ## Stop all services
 dev-logs: ## Tail logs for all services
 	docker compose logs -f
 
-db-up: ## Start only PostgreSQL + Redis
-	docker compose up -d postgres redis
+db-up: ## Start only PostgreSQL
+	docker compose up -d postgres
 
-db-down: ## Stop PostgreSQL + Redis
-	docker compose down postgres redis
+db-down: ## Stop PostgreSQL
+	docker compose down postgres
 
 # ─── Master Server ───────────────────────────────────────────────────
 

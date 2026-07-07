@@ -1,23 +1,44 @@
 package services
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"log"
 
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 
+	"github.com/sneaky-developer/UptimeHub/master/internal/config"
 	"github.com/sneaky-developer/UptimeHub/master/internal/models"
 )
 
-// SeedDefaultAdmin creates a default admin user if none exist
-func SeedDefaultAdmin(db *gorm.DB) {
+// SeedDefaultAdmin creates the initial admin user if none exist.
+// Email and password come from ADMIN_EMAIL / ADMIN_PASSWORD. When no password
+// is configured, development uses "admin123" for a friction-free first run;
+// production generates a random one and prints it once to the logs.
+func SeedDefaultAdmin(db *gorm.DB, cfg *config.Config) {
 	var count int64
 	db.Model(&models.AdminUser{}).Count(&count)
 	if count > 0 {
 		return
 	}
 
-	password := "admin123" // Default password, should be changed
+	password := cfg.AdminPassword
+	generated := false
+	if password == "" {
+		if cfg.IsDevelopment() {
+			password = "admin123"
+		} else {
+			bytes := make([]byte, 16)
+			if _, err := rand.Read(bytes); err != nil {
+				log.Printf("Error generating admin password: %v", err)
+				return
+			}
+			password = hex.EncodeToString(bytes)
+			generated = true
+		}
+	}
+
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		log.Printf("Error hashing default admin password: %v", err)
@@ -25,7 +46,7 @@ func SeedDefaultAdmin(db *gorm.DB) {
 	}
 
 	admin := models.AdminUser{
-		Email:        "admin@uptimehub.local",
+		Email:        cfg.AdminEmail,
 		PasswordHash: string(hash),
 		Name:         "Admin",
 		Role:         "admin",
@@ -36,5 +57,10 @@ func SeedDefaultAdmin(db *gorm.DB) {
 		return
 	}
 
-	log.Println("🔑 Default admin created: admin@uptimehub.local / admin123")
+	if generated {
+		log.Printf("🔑 Admin user created: %s", cfg.AdminEmail)
+		log.Printf("🔑 Generated admin password (shown once, store it now): %s", password)
+	} else {
+		log.Printf("🔑 Admin user created: %s", cfg.AdminEmail)
+	}
 }

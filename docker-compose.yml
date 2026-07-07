@@ -15,18 +15,6 @@ services:
       timeout: 5s
       retries: 5
 
-  redis:
-    image: redis:7-alpine
-    container_name: uptimehub-redis
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
   master:
     build:
       context: ./master
@@ -74,6 +62,9 @@ services:
       - MASTER_URL=http://master:8080
       - AGENT_NAME=local-agent-1
       - CLUSTER_NAME=local-docker
+      - IN_CLUSTER=false
+      # Create an agent group in the admin UI and put its token in .env
+      - ENROLLMENT_TOKEN=${ENROLLMENT_TOKEN:-}
     depends_on:
       - master
 

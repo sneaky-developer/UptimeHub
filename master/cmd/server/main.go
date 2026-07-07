@@ -19,6 +19,9 @@ import (
 func main() {
 	// Load configuration
 	cfg := config.Load()
+	if err := cfg.Validate(); err != nil {
+		log.Fatalf("❌ Invalid configuration: %v", err)
+	}
 
 	// Set Gin mode
 	if !cfg.IsDevelopment() {
@@ -32,12 +35,12 @@ func main() {
 	}
 
 	// Seed default admin user
-	services.SeedDefaultAdmin(db)
+	services.SeedDefaultAdmin(db, cfg)
 
 	// Initialize services
 	notifierSvc := notifier.NewService(db)
 	monitorSvc := services.NewMonitorService(db, notifierSvc)
-	aggregatorSvc := services.NewAggregatorService(db)
+	aggregatorSvc := services.NewAggregatorService(db, cfg.CheckRetentionDays)
 
 	// Start background workers
 	aggregatorSvc.Start()
@@ -77,6 +80,7 @@ func main() {
 		agent.POST("/status", agentHandler.Status)
 		agent.GET("/config", agentHandler.Config)
 		agent.POST("/heartbeat", agentHandler.Heartbeat)
+		agent.POST("/discovery", agentHandler.Discovery)
 	}
 
 	// ─── Admin API (JWT auth) ───────────────────────────────────────

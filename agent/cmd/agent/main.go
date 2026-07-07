@@ -78,6 +78,9 @@ func main() {
 }
 
 func runMonitoringLoop(ctx context.Context, cfg *config.Config, disc *discovery.Discovery, chk *checker.Checker, rep *reporter.Reporter) {
+	// Discover and report K8s services first so they are part of the initial config
+	syncDiscovery(ctx, disc, rep)
+
 	// Fetch initial config from Master
 	masterConfig, err := rep.FetchConfig()
 	if err != nil {
@@ -96,6 +99,10 @@ func runMonitoringLoop(ctx context.Context, cfg *config.Config, disc *discovery.
 			return
 
 		case <-configSyncTicker.C:
+			// Re-discover K8s services and sync them to Master first, so the
+			// config fetched below already includes newly discovered services
+			syncDiscovery(ctx, disc, rep)
+
 			// Resync config from Master
 			newConfig, err := rep.FetchConfig()
 			if err != nil {
@@ -103,14 +110,6 @@ func runMonitoringLoop(ctx context.Context, cfg *config.Config, disc *discovery.
 			} else {
 				masterConfig = newConfig
 				log.Printf("🔄 Config synced: %d services", len(masterConfig.Services))
-			}
-
-			// Re-discover K8s services
-			if disc != nil {
-				_, err := disc.Discover(ctx)
-				if err != nil {
-					log.Printf("⚠️  K8s discovery failed: %v", err)
-				}
 			}
 
 		case <-checkTicker.C:
@@ -154,6 +153,34 @@ func runMonitoringLoop(ctx context.Context, cfg *config.Config, disc *discovery.
 				log.Printf("⚠️  Failed to report results: %v", err)
 			}
 		}
+	}
+}
+
+// syncDiscovery discovers K8s services and reports them to the Master so they
+// become monitored services assigned to this agent.
+func syncDiscovery(ctx context.Context, disc *discovery.Discovery, rep *reporter.Reporter) {
+	if disc == nil {
+		return
+	}
+
+	discovered, complete, err := disc.Discover(ctx)
+	if err != nil {
+		log.Printf("⚠️  K8s discovery failed: %v", err)
+		return
+	}
+
+	payloads := make([]reporter.DiscoveredServicePayload, 0, len(discovered))
+	for _, d := range discovered {
+		payloads = append(payloads, reporter.DiscoveredServicePayload{
+			Key:       d.Key,
+			Name:      d.Name,
+			Namespace: d.Namespace,
+			URL:       d.URL,
+		})
+	}
+
+	if err := rep.ReportDiscovered(payloads, complete); err != nil {
+		log.Printf("⚠️  Failed to report discovered services: %v", err)
 	}
 }
 

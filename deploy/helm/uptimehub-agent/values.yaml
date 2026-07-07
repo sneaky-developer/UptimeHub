@@ -1,0 +1,70 @@
+# Default values for uptimehub-agent.
+
+image:
+  repository: ghcr.io/sneaky-developer/uptimehub-agent
+  tag: ""            # defaults to Chart appVersion
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# ─── Master connection (required) ──────────────────────────────────
+master:
+  # URL of the UptimeHub master server, reachable from inside the cluster
+  url: ""            # e.g. https://uptimehub.example.com
+
+  # Enrollment token for an agent group, created in the admin UI
+  # (Admin → Agents → Groups). Either set it inline...
+  enrollmentToken: ""
+  # ...or reference an existing Secret containing the key ENROLLMENT_TOKEN
+  existingSecret: ""
+
+# ─── Agent identity ─────────────────────────────────────────────────
+agent:
+  # Agent name as shown in the admin dashboard; defaults to the release name
+  name: ""
+  # Namespace to discover services in; empty = all namespaces
+  watchNamespace: ""
+  # Check / sync tuning (seconds)
+  defaultInterval: 30
+  defaultTimeout: 10
+  heartbeatInterval: 60
+  configSyncInterval: 60
+
+# Extra environment variables for the agent container
+extraEnv: []
+#  - name: DEFAULT_RETRIES
+#    value: "3"
+
+# ─── RBAC ───────────────────────────────────────────────────────────
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+rbac:
+  # Creates a ClusterRole allowing the agent to list Services and Ingresses.
+  # Set to false if you manage RBAC yourself.
+  create: true
+
+# ─── Pod settings ───────────────────────────────────────────────────
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 150Mi
+
+podAnnotations: {}
+podLabels: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]

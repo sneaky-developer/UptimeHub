@@ -1,3 +1,12 @@
+# Environment
+.env
+.env.local
+
+# Go build output
+master/bin/
+agent/bin/
+
+# Frontend
 frontend/node_modules
 frontend/.next
 frontend/out
@@ -5,3 +14,8 @@ frontend/dist
 frontend/build
 frontend/.turbo
 frontend/coverage
+
+# Editors / OS
+.DS_Store
+.idea/
+*.swp

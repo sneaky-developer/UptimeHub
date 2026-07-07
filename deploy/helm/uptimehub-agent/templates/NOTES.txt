@@ -1,0 +1,20 @@
+UptimeHub agent deployed.
+
+Master URL:  {{ .Values.master.url }}
+Agent name:  {{ .Values.agent.name | default .Release.Name }}
+
+Check the agent's registration:
+
+  kubectl logs -n {{ .Release.Namespace }} deployment/{{ include "uptimehub-agent.fullname" . }} -f
+
+The agent should appear under Admin → Agents in your UptimeHub dashboard
+within a minute. Label services to enable monitoring:
+
+  metadata:
+    labels:
+      monitoring.enabled: "true"
+    annotations:
+      monitoring.path: "/health"
+      monitoring.port: "8080"
+
+Discovered services appear under Admin → Services (not public by default).

@@ -23,6 +23,7 @@ const (
 
 // DiscoveredService represents a K8s service discovered for monitoring
 type DiscoveredService struct {
+	Key       string // stable identity across syncs, e.g. "svc/default/my-api"
 	Name      string
 	Namespace string
 	URL       string
@@ -71,8 +72,10 @@ func NewDiscovery(inCluster bool, namespace string) (*Discovery, error) {
 	}, nil
 }
 
-// Discover finds all services with the monitoring label
-func (d *Discovery) Discover(ctx context.Context) ([]DiscoveredService, error) {
+// Discover finds all services with the monitoring label. The returned bool
+// reports whether the discovery covered all sources (Services and Ingresses);
+// callers should only treat the list as authoritative when it is true.
+func (d *Discovery) Discover(ctx context.Context) ([]DiscoveredService, bool, error) {
 	labelSelector := LabelMonitoringEnabled + "=true"
 
 	namespace := d.namespace
@@ -85,8 +88,10 @@ func (d *Discovery) Discover(ctx context.Context) ([]DiscoveredService, error) {
 		LabelSelector: labelSelector,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to list services: %w", err)
+		return nil, false, fmt.Errorf("failed to list services: %w", err)
 	}
+
+	complete := true
 
 	var discovered []DiscoveredService
 
@@ -108,6 +113,7 @@ func (d *Discovery) Discover(ctx context.Context) ([]DiscoveredService, error) {
 			svc.Name, svc.Namespace, port, path)
 
 		discovered = append(discovered, DiscoveredService{
+			Key:       fmt.Sprintf("svc/%s/%s", svc.Namespace, svc.Name),
 			Name:      svc.Name,
 			Namespace: svc.Namespace,
 			URL:       url,
@@ -122,6 +128,7 @@ func (d *Discovery) Discover(ctx context.Context) ([]DiscoveredService, error) {
 	})
 	if err != nil {
 		log.Printf("Warning: failed to list ingresses (may need RBAC): %v", err)
+		complete = false
 	} else {
 		for _, ing := range ingList.Items {
 			path := "/health"
@@ -138,6 +145,7 @@ func (d *Discovery) Discover(ctx context.Context) ([]DiscoveredService, error) {
 
 					url := fmt.Sprintf("%s://%s%s", scheme, rule.Host, path)
 					discovered = append(discovered, DiscoveredService{
+						Key:       fmt.Sprintf("ing/%s/%s/%s", ing.Namespace, ing.Name, rule.Host),
 						Name:      ing.Name,
 						Namespace: ing.Namespace,
 						URL:       url,
@@ -155,7 +163,7 @@ func (d *Discovery) Discover(ctx context.Context) ([]DiscoveredService, error) {
 	log.Printf("🔍 Discovered %d services (%d from K8s Services, %d from Ingresses)",
 		len(discovered), len(svcList.Items), len(discovered)-len(svcList.Items))
 
-	return discovered, nil
+	return discovered, complete, nil
 }
 
 // GetServices returns the last discovered services

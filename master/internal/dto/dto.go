@@ -60,6 +60,26 @@ type AgentHeartbeatRequest struct {
 	Metadata map[string]interface{} `json:"metadata"`
 }
 
+type DiscoveredServiceItem struct {
+	Key       string `json:"key" binding:"required"` // stable identity, e.g. "svc/default/my-api"
+	Name      string `json:"name" binding:"required"`
+	Namespace string `json:"namespace"`
+	URL       string `json:"url" binding:"required"`
+}
+
+type AgentDiscoveryRequest struct {
+	// Complete indicates the list is the agent's full view of the cluster,
+	// allowing the master to prune discovered services that no longer exist.
+	Complete bool                    `json:"complete"`
+	Services []DiscoveredServiceItem `json:"services" binding:"dive"`
+}
+
+type AgentDiscoveryResponse struct {
+	Created int `json:"created"`
+	Updated int `json:"updated"`
+	Pruned  int `json:"pruned"`
+}
+
 // ─── Admin DTOs ─────────────────────────────────────────────────────
 
 type CreateAgentGroupRequest struct {

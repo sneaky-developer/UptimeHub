@@ -1,22 +1,28 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 )
 
 // Config holds all application configuration
 type Config struct {
-	AppEnv      string
-	AppPort     string
-	DBHost      string
-	DBPort      string
-	DBUser      string
-	DBPassword  string
-	DBName      string
-	DBSSLMode   string
-	JWTSecret   string
-	CORSOrigins string
+	AppEnv        string
+	AppPort       string
+	DBHost        string
+	DBPort        string
+	DBUser        string
+	DBPassword    string
+	DBName        string
+	DBSSLMode     string
+	JWTSecret     string
+	CORSOrigins   string
+	AdminEmail    string
+	AdminPassword string
+
+	// CheckRetentionDays is how long raw check results are kept
+	CheckRetentionDays int
 }
 
 // Load reads configuration from environment variables
@@ -30,9 +36,34 @@ func Load() *Config {
 		DBPassword:  getEnv("DB_PASSWORD", "uptimehub_secret"),
 		DBName:      getEnv("DB_NAME", "uptimehub"),
 		DBSSLMode:   getEnv("DB_SSLMODE", "disable"),
-		JWTSecret:   getEnv("JWT_SECRET", "change-me-in-production"),
-		CORSOrigins: getEnv("CORS_ORIGINS", "http://localhost:3000"),
+		JWTSecret:     getEnv("JWT_SECRET", "change-me-in-production"),
+		CORSOrigins:   getEnv("CORS_ORIGINS", "http://localhost:3000"),
+		AdminEmail:    getEnv("ADMIN_EMAIL", "admin@uptimehub.local"),
+		AdminPassword: getEnv("ADMIN_PASSWORD", ""),
+
+		CheckRetentionDays: getEnvInt("CHECK_RETENTION_DAYS", 90),
 	}
+}
+
+// insecureJWTSecrets are placeholder values that must never reach production
+var insecureJWTSecrets = map[string]bool{
+	"":                                   true,
+	"change-me-in-production":            true,
+	"dev-jwt-secret-change-in-production": true,
+}
+
+// Validate rejects insecure settings when not running in development
+func (c *Config) Validate() error {
+	if c.IsDevelopment() {
+		return nil
+	}
+	if insecureJWTSecrets[c.JWTSecret] {
+		return fmt.Errorf("JWT_SECRET must be set to a strong random value when APP_ENV is not development")
+	}
+	if len(c.JWTSecret) < 32 {
+		return fmt.Errorf("JWT_SECRET must be at least 32 characters when APP_ENV is not development")
+	}
+	return nil
 }
 
 // DSN returns the PostgreSQL connection string

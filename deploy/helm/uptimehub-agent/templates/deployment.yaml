@@ -1,0 +1,81 @@
+{{- if not .Values.master.url }}
+{{- fail "Set master.url to the address of your UptimeHub master server" }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "uptimehub-agent.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "uptimehub-agent.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "uptimehub-agent.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "uptimehub-agent.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "uptimehub-agent.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: agent
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: MASTER_URL
+              value: {{ .Values.master.url | quote }}
+            - name: AGENT_NAME
+              value: {{ .Values.agent.name | default .Release.Name | quote }}
+            - name: IN_CLUSTER
+              value: "true"
+            - name: KUBE_NAMESPACE
+              value: {{ .Values.agent.watchNamespace | quote }}
+            - name: DEFAULT_INTERVAL
+              value: {{ .Values.agent.defaultInterval | quote }}
+            - name: DEFAULT_TIMEOUT
+              value: {{ .Values.agent.defaultTimeout | quote }}
+            - name: HEARTBEAT_INTERVAL
+              value: {{ .Values.agent.heartbeatInterval | quote }}
+            - name: CONFIG_SYNC_INTERVAL
+              value: {{ .Values.agent.configSyncInterval | quote }}
+            - name: ENROLLMENT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "uptimehub-agent.secretName" . }}
+                  key: ENROLLMENT_TOKEN
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

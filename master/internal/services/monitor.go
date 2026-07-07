@@ -38,10 +38,23 @@ func (s *MonitorService) ProcessCheckResults(agentID uuid.UUID, results []models
 		return 0, fmt.Errorf("failed to insert check results: %w", err)
 	}
 
-	// Update service statuses based on recent results
+	// Update each affected service's status once, sequentially in a single
+	// goroutine — concurrent updates for the same service can race and
+	// double-create incidents
+	seen := make(map[uuid.UUID]bool, len(results))
+	serviceIDs := make([]uuid.UUID, 0, len(results))
 	for _, result := range results {
-		go s.updateServiceStatus(result.ServiceID)
+		if !seen[result.ServiceID] {
+			seen[result.ServiceID] = true
+			serviceIDs = append(serviceIDs, result.ServiceID)
+		}
 	}
+
+	go func() {
+		for _, id := range serviceIDs {
+			s.updateServiceStatus(id)
+		}
+	}()
 
 	return len(results), nil
 }
@@ -70,24 +83,8 @@ func (s *MonitorService) updateServiceStatus(serviceID uuid.UUID) {
 		return
 	}
 
-	// Count consecutive failures from most recent
-	failCount := 0
-	for _, check := range recentChecks {
-		if !check.IsUp {
-			failCount++
-		} else {
-			break
-		}
-	}
-
 	oldStatus := service.Status
-	newStatus := "up"
-
-	if failCount >= threshold {
-		newStatus = "down"
-	} else if failCount > 0 {
-		newStatus = "degraded"
-	}
+	newStatus := computeStatus(recentChecks, threshold)
 
 	if oldStatus != newStatus {
 		s.db.Model(&service).Update("status", newStatus)
@@ -98,6 +95,29 @@ func (s *MonitorService) updateServiceStatus(serviceID uuid.UUID) {
 		} else if newStatus == "up" && oldStatus == "down" {
 			s.resolveAutoIncidents(&service)
 		}
+	}
+}
+
+// computeStatus derives a service status from its most recent checks
+// (ordered newest first): "down" after threshold consecutive failures,
+// "degraded" while failures accumulate, otherwise "up"
+func computeStatus(recentChecks []models.CheckResult, threshold int) string {
+	failCount := 0
+	for _, check := range recentChecks {
+		if !check.IsUp {
+			failCount++
+		} else {
+			break
+		}
+	}
+
+	switch {
+	case failCount >= threshold:
+		return "down"
+	case failCount > 0:
+		return "degraded"
+	default:
+		return "up"
 	}
 }
 

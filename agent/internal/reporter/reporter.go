@@ -81,6 +81,54 @@ func (r *Reporter) ReportResults(results []CheckResultPayload) error {
 	return nil
 }
 
+// DiscoveredServicePayload describes a K8s service found by discovery
+type DiscoveredServicePayload struct {
+	Key       string `json:"key"`
+	Name      string `json:"name"`
+	Namespace string `json:"namespace"`
+	URL       string `json:"url"`
+}
+
+// DiscoveryRequest is the batch request body for reporting discovered services
+type DiscoveryRequest struct {
+	Complete bool                       `json:"complete"`
+	Services []DiscoveredServicePayload `json:"services"`
+}
+
+// ReportDiscovered sends the current set of discovered services to the Master.
+// complete indicates the list covers all sources, allowing the Master to prune
+// services that no longer exist in the cluster.
+func (r *Reporter) ReportDiscovered(services []DiscoveredServicePayload, complete bool) error {
+	body := DiscoveryRequest{Complete: complete, Services: services}
+
+	data, err := json.Marshal(body)
+	if err != nil {
+		return fmt.Errorf("failed to marshal discovered services: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, r.masterURL+"/api/agent/discovery", bytes.NewReader(data))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+r.token)
+
+	resp, err := r.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send discovered services: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("master returned status %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	log.Printf("📡 Synced %d discovered services with master", len(services))
+	return nil
+}
+
 // RegisterRequest is the body for agent registration
 type RegisterRequest struct {
 	Name     string                 `json:"name"`

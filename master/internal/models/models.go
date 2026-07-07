@@ -48,6 +48,8 @@ type Service struct {
 	Status           string         `gorm:"size:20;default:'unknown'" json:"status"` // up, down, degraded, unknown
 	IsPublic         bool           `gorm:"default:true" json:"is_public"`
 	GroupName        string         `gorm:"size:255" json:"group_name"`
+	Source           string         `gorm:"size:20;not null;default:'manual'" json:"source"` // manual, discovered
+	DiscoveryKey     string         `gorm:"size:512;index" json:"discovery_key,omitempty"`
 	CreatedAt        time.Time      `json:"created_at"`
 	UpdatedAt        time.Time      `json:"updated_at"`
 	DeletedAt        gorm.DeletedAt `gorm:"index" json:"-"`

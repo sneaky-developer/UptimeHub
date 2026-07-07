@@ -10,20 +10,27 @@ import (
 	"github.com/sneaky-developer/UptimeHub/master/internal/models"
 )
 
-// AggregatorService computes hourly/daily uptime aggregations
+// AggregatorService computes hourly/daily uptime aggregations and prunes
+// old raw check results
 type AggregatorService struct {
-	db *gorm.DB
+	db            *gorm.DB
+	retentionDays int
 }
 
-// NewAggregatorService creates a new AggregatorService
-func NewAggregatorService(db *gorm.DB) *AggregatorService {
-	return &AggregatorService{db: db}
+// NewAggregatorService creates a new AggregatorService. retentionDays controls
+// how long raw check results are kept (aggregations are kept forever).
+func NewAggregatorService(db *gorm.DB, retentionDays int) *AggregatorService {
+	if retentionDays < 1 {
+		retentionDays = 90
+	}
+	return &AggregatorService{db: db, retentionDays: retentionDays}
 }
 
 // Start begins the periodic aggregation workers
 func (s *AggregatorService) Start() {
 	go s.runHourlyAggregation()
 	go s.runDailyAggregation()
+	go s.runRetention()
 	log.Println("📊 Aggregation workers started")
 }
 
@@ -39,9 +46,10 @@ func (s *AggregatorService) runHourlyAggregation() {
 }
 
 func (s *AggregatorService) runDailyAggregation() {
-	// Run immediately, then every 24 hours
+	// Run immediately, then hourly so today's partial stats stay fresh —
+	// without this a new install shows an empty status page until midnight
 	s.aggregate("daily", 24*time.Hour)
-	ticker := time.NewTicker(24 * time.Hour)
+	ticker := time.NewTicker(time.Hour)
 	defer ticker.Stop()
 
 	for range ticker.C {
@@ -49,20 +57,45 @@ func (s *AggregatorService) runDailyAggregation() {
 	}
 }
 
+// runRetention prunes raw check results past the retention window once a day
+func (s *AggregatorService) runRetention() {
+	s.pruneCheckResults()
+	ticker := time.NewTicker(24 * time.Hour)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		s.pruneCheckResults()
+	}
+}
+
+func (s *AggregatorService) pruneCheckResults() {
+	cutoff := time.Now().UTC().AddDate(0, 0, -s.retentionDays)
+	result := s.db.Where("checked_at < ?", cutoff).Delete(&models.CheckResult{})
+	if result.Error != nil {
+		log.Printf("⚠️  Check result retention failed: %v", result.Error)
+	} else if result.RowsAffected > 0 {
+		log.Printf("🧹 Pruned %d check results older than %d days", result.RowsAffected, s.retentionDays)
+	}
+}
+
 func (s *AggregatorService) aggregate(periodType string, period time.Duration) {
-	// Calculate period boundaries
+	// Aggregate the previous complete period and the current partial one, so
+	// the status page reflects data as soon as checks start flowing
 	now := time.Now().UTC()
-	var start, end time.Time
+	var currentStart time.Time
 
 	switch periodType {
 	case "hourly":
-		end = now.Truncate(time.Hour)
-		start = end.Add(-time.Hour)
+		currentStart = now.Truncate(time.Hour)
 	case "daily":
-		end = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
-		start = end.Add(-24 * time.Hour)
+		currentStart = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
 	}
 
+	s.aggregatePeriod(periodType, currentStart.Add(-period), currentStart)
+	s.aggregatePeriod(periodType, currentStart, currentStart.Add(period))
+}
+
+func (s *AggregatorService) aggregatePeriod(periodType string, start, end time.Time) {
 	// Get all services
 	var services []models.Service
 	s.db.Find(&services)
@@ -109,6 +142,4 @@ func (s *AggregatorService) aggregate(periodType string, period time.Duration) {
 			svc.ID, start, periodType,
 		).Assign(agg).FirstOrCreate(&agg)
 	}
-
-	log.Printf("📊 %s aggregation completed for %s", periodType, start.Format("2006-01-02 15:04"))
 }

@@ -1,0 +1,14 @@
+apiVersion: v2
+name: uptimehub-agent
+description: UptimeHub worker agent — discovers and health-checks services in a Kubernetes cluster and reports uptime to an UptimeHub master server
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/sneaky-developer/UptimeHub
+sources:
+  - https://github.com/sneaky-developer/UptimeHub
+keywords:
+  - monitoring
+  - uptime
+  - status-page
+  - kubernetes
